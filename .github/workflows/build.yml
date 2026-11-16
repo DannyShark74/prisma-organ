@@ -1,0 +1,114 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    name: macOS plugin (VST3 + AU, universal) and installer
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: brew list ninja >/dev/null 2>&1 || brew install ninja
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          -DPRISMA_BUILD_TOOLS=ON
+
+      - name: Build
+        run: cmake --build build --target Prisma_VST3 Prisma_AU PrismaRender -j 4
+
+      - name: Engine checks (tuning, levels, NaN, CPU, sample rates)
+        run: build/PrismaRender_artefacts/Release/PrismaRender --test
+
+      - name: Sign (ad hoc) and package
+        run: |
+          set -e
+          ART=build/Prisma_artefacts/Release
+          mkdir -p dist
+          cp -R "$ART/VST3/Prisma.vst3" dist/
+          cp -R "$ART/AU/Prisma.component" dist/
+          for b in dist/Prisma.vst3 dist/Prisma.component; do codesign --force --deep --sign - "$b"; done
+          lipo -info dist/Prisma.vst3/Contents/MacOS/Prisma
+          cp docs/INSTALL-mac.txt dist/
+          VERSION=$(sed -n 's/^project(Prisma VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          (cd dist && zip -qry ../Prisma-macOS.zip .)
+
+      - name: Build installer
+        run: installer/build_pkg.sh "$VERSION" dist pkg
+
+      - name: Test the installer (fresh install and update over it)
+        run: |
+          set -e
+          rm -rf ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3 ~/Library/Audio/Plug-Ins/Components/Prisma.component
+          installer -pkg "pkg/Prisma-$VERSION.pkg" -target CurrentUserHomeDirectory
+          test -f ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3/Contents/MacOS/Prisma
+          test -f ~/Library/Audio/Plug-Ins/Components/Prisma.component/Contents/MacOS/Prisma
+          installer -pkg "pkg/Prisma-$VERSION.pkg" -target CurrentUserHomeDirectory
+          cmp ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3/Contents/MacOS/Prisma dist/Prisma.vst3/Contents/MacOS/Prisma
+          codesign --verify --deep ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3
+          echo "installer OK"
+
+      - name: Validate VST3 with pluginval
+        run: |
+          set -e
+          curl -fsSL -o pluginval.zip https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_macOS.zip
+          unzip -q pluginval.zip
+          ./pluginval.app/Contents/MacOS/pluginval --strictness-level 5 --validate-in-process --timeout-ms 600000 --output-dir pluginval-logs dist/Prisma.vst3
+
+      - name: Validate AU with auval (installed by the installer)
+        run: |
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 3
+          auval -v aumu Prsm Dnsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Prisma-installer
+          path: pkg/Prisma-${{ env.VERSION }}.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Prisma-macOS
+          path: Prisma-macOS.zip
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pluginval-logs
+          path: pluginval-logs
+          if-no-files-found: ignore
+
+      - name: Publish the latest build to the "downloads" branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          mkdir -p pub && cp "pkg/Prisma-$VERSION.pkg" pub/ && cp Prisma-macOS.zip pub/ && cp docs/INSTALL-mac.txt pub/
+          cd pub
+          printf '# Prisma %s\n\nУстановщик: **Prisma-%s.pkg** (нажмите на файл, затем «Download raw file»).\nСборка из коммита %s.\n' "$VERSION" "$VERSION" "${GITHUB_SHA::7}" > README.md
+          git init -q -b downloads
+          git config user.name "Prisma CI"; git config user.email "ci@users.noreply.github.com"
+          git add . && git commit -qm "Prisma $VERSION (${GITHUB_SHA::7})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" downloads
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Prisma-macOS.zip
+            pkg/Prisma-${{ env.VERSION }}.pkg

@@ -1,0 +1,6 @@
+#!/bin/bash
+# $2 is the folder the bundle was installed into.
+xattr -dr com.apple.quarantine "$2/Prisma.vst3" "$2/Prisma.component" 2>/dev/null || true
+# let macOS re-read Audio Units (Logic, GarageBand, FL Studio's AU scan)
+killall -9 AudioComponentRegistrar 2>/dev/null || true
+exit 0

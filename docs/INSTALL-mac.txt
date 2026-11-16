@@ -1,0 +1,24 @@
+Prisma — установка на Mac
+
+1. Откройте Prisma-<версия>.pkg.
+   Если macOS пишет «не удаётся проверить разработчика»: правый клик по файлу → «Открыть» → «Открыть».
+   (Или «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть».)
+2. Нажимайте «Продолжить». Установщик сам положит:
+   VST3        → ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3
+   Audio Unit  → ~/Library/Audio/Plug-Ins/Components/Prisma.component
+   Старая версия заменяется.
+3. Закройте FL Studio перед установкой. После неё: Options → Manage plugins → Find installed plugins.
+   Prisma — это инструмент (генератор), его добавляют в Channel Rack, а не в микшер.
+
+Управление с MIDI-клавиатуры
+   Колесо модуляции (CC1)   — вращающийся динамик: вниз Slow, вверх Fast
+   Экспрессия (CC11)        — громкость органа (как педаль у настоящего)
+   Сустейн (CC64)           — держит ноты
+
+Вручную (архив Prisma-macOS.zip)
+   Prisma.vst3       →  ~/Library/Audio/Plug-Ins/VST3/
+   Prisma.component  →  ~/Library/Audio/Plug-Ins/Components/
+   Папка ~/Library скрыта: в Finder нажмите Cmd+Shift+G и вставьте путь.
+   Затем в «Терминале»:
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/Prisma.vst3
+   xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/Components/Prisma.component
