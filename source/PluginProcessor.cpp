@@ -82,6 +82,9 @@ void PrismaProcessor::setCurrentProgram (int index)
     if (! juce::isPositiveAndBelow (index, (int) list.size())) return;
     currentProgram = index;
     publishPresetInfo();
+    // the host's "Program" parameter follows presets picked in Prisma's own window (FL Studio reads it to name tracks)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        updateHostDisplay (ChangeDetails().withProgramChanged (true));
     const auto& pr = list[(size_t) index];
     for (auto& d : paramTable())
     {
