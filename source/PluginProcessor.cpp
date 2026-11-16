@@ -14,6 +14,13 @@ PrismaProcessor::PrismaProcessor()
         raw.emplace_back (d.id, p);
         rawById[d.id] = p;
     }
+    publishPresetInfo();
+}
+
+void PrismaProcessor::publishPresetInfo()
+{
+    if (auto* p = dynamic_cast<PresetInfoParam*> (apvts.getParameter ("presetInfo")))
+        p->setInfo ("organ|" + getProgramName (currentProgram));
 }
 
 bool PrismaProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -74,6 +81,7 @@ void PrismaProcessor::setCurrentProgram (int index)
     const auto& list = factoryPresets();
     if (! juce::isPositiveAndBelow (index, (int) list.size())) return;
     currentProgram = index;
+    publishPresetInfo();
     const auto& pr = list[(size_t) index];
     for (auto& d : paramTable())
     {
@@ -101,6 +109,7 @@ void PrismaProcessor::setStateInformation (const void* data, int sizeInBytes)
             auto tree = juce::ValueTree::fromXml (*xml);
             currentProgram = tree.getProperty ("program", 0);
             apvts.replaceState (tree);
+            publishPresetInfo();
         }
 }
 

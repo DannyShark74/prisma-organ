@@ -36,6 +36,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout()
             }
         }
     }
+    layout.add (std::make_unique<PresetInfoParam>());   // last, so the indexes of all earlier parameters stay as they were
     return layout;
 }
 }
