@@ -43,6 +43,7 @@ public:
 
 private:
     prisma::EngineParams readParams() const;
+    void publishPresetInfo();
 
     prisma::Engine engine;
     std::vector<std::pair<std::string, std::atomic<float>*>> raw;

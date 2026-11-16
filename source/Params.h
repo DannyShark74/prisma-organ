@@ -86,4 +86,22 @@ namespace prisma::pid
 namespace prisma
 {
     juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+
+    // Read-only, not automatable parameter whose text is the current preset ("organ|name").
+    // A DAW script reads it to name mixer tracks after the sound; the value itself never changes.
+    struct PresetInfoParam : juce::AudioParameterFloat
+    {
+        PresetInfoParam() : juce::AudioParameterFloat (juce::ParameterID { "presetInfo", 1 }, "Preset Info",
+                                                       juce::NormalisableRange<float> (0.0f, 1.0f), 0.0f,
+                                                       juce::AudioParameterFloatAttributes().withAutomatable (false)) {}
+        juce::String getText (float, int maxLen) const override
+        {
+            const juce::ScopedLock sl (lock);
+            return maxLen > 0 ? text.substring (0, maxLen) : text;
+        }
+        float getValueForText (const juce::String&) const override { return get(); }
+        void setInfo (const juce::String& s) { const juce::ScopedLock sl (lock); text = s; }
+        juce::CriticalSection lock;
+        juce::String text;
+    };
 }
